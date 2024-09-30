@@ -9,7 +9,6 @@ class StudentsModel {
 
     return new Promise((resolve, reject) => {
       db.get(sql, [student.username, student.password], (err, row) => {
-        console.log(row);
         if (err) reject(err);
         if (row == undefined) reject("اسم المستخدم أو كلمة المرور غير صالحة");
         resolve(row);

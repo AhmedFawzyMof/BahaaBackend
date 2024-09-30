@@ -15,7 +15,7 @@ const Login = async (req, res) => {
       password: hashedPassword,
     }).Login();
 
-    const token = jwt.sign({ id: student.id }, process.env.JWT_SECRET);
+    const token = jwt.sign({ student: student }, process.env.JWT_SECRET);
     res.status(200).json({ token });
   } catch (error) {
     console.log(error);
