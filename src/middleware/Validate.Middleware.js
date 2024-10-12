@@ -10,7 +10,7 @@ const validateToken = (req, res, next) => {
     if (err) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    req.params = decoded;
+    req.params.student = { ...decoded.student };
     next();
   });
 };
