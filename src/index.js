@@ -27,11 +27,13 @@ const StudentRouter = require("./routes/Student.Router");
 const TestsRouter = require("./routes/Tests.Router");
 const HomeworksRouter = require("./routes/Homeworks.Router");
 const QuestionsRouter = require("./routes/Questions.Router");
+const TeacherRouter = require("./routes/Teacher.Router");
 
 app.use("/api/student", StudentRouter);
 app.use("/api/tests", TestsRouter);
 app.use("/api/homeworks", HomeworksRouter);
 app.use("/api/questions", QuestionsRouter);
+app.use("/api/teacher", TeacherRouter);
 
 app.use((req, res, next) => {
   if (req.url.includes("api")) {
