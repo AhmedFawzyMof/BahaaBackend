@@ -1,5 +1,6 @@
 const Homeworks = require("../models/Homeworks.Model");
 const StudentsModel = require("../models/Students.Model");
+const Grades = require("../models/Grade.Model");
 const { AutoCorrect } = require("../utils/AutoCorrect");
 
 const GetHomeworks = async (req, res) => {
@@ -154,10 +155,86 @@ const Results = async (req, res) => {
   }
 };
 
+const GetAllHomeworksTeacher = async (req, res) => {
+  try {
+    const { stage, limit } = req.params;
+
+    const homeworks = await new Homeworks({
+      stage: parseInt(stage),
+      limit: parseInt(limit),
+    }).getAll();
+    const grades = await new Grades({}).GetAll();
+    res.status(200).json({ homeworks, grades });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+// const CreateStudent = async (req, res) => {
+//   try {
+//     const student = req.body;
+
+//     const message = await new Student({
+//       username: student.username,
+//       password: student.password,
+//       grade: student.grade,
+//       parent_phone: student.parent_phone,
+//       isBlocked: student.isBlocked,
+//       BlockReason: student.BlockReason,
+//     }).Create();
+
+//     res.json({
+//       message: message,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: error });
+//   }
+// };
+
+// const UpdateStudent = async (req, res) => {
+//   try {
+//     const student = req.body;
+//     const message = await new Student({
+//       username: student.username,
+//       password: student.password,
+//       grade: student.grade,
+//       parent_phone: student.parent_phone,
+//       isBlocked: student.isBlocked,
+//       BlockReason: student.BlockReason,
+//       id: student.id,
+//     }).Update();
+//     res.json({
+//       message: message,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: error });
+//   }
+// };
+
+// const DeleteStudent = async (req, res) => {
+//   try {
+//     const id = req.params.id;
+//     const message = await new Student({
+//       id,
+//     }).Delete();
+
+//     res.json({
+//       message: message,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: err });
+//   }
+// };
+
 module.exports = {
   GetHomeworks,
   GetAllHomeworks,
   GetHomeworkQuestions,
+  GetAllHomeworksTeacher,
   SubmitHomework,
   Results,
 };

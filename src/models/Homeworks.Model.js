@@ -173,6 +173,22 @@ class Homeworks {
       );
     });
   }
+
+  getAll() {
+    const homework = this.homeworks;
+    let offset = homework.limit - 30;
+    console.log(homework, offset);
+    return new Promise((resolve, reject) => {
+      db.all(
+        "SELECT * FROM Homework WHERE grade_id = ? LIMIT ? OFFSET ?",
+        [homework.stage, 30, offset],
+        (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        }
+      );
+    });
+  }
 }
 
 module.exports = Homeworks;

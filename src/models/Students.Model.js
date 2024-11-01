@@ -1,4 +1,9 @@
+const { throws } = require("assert");
 const db = require("../database");
+const crypto = require("crypto");
+const { v4: uuidv4 } = require("uuid");
+const { resolve } = require("path");
+
 class StudentsModel {
   constructor(student) {
     this.student = student;
@@ -41,7 +46,6 @@ class StudentsModel {
       });
     }
   }
-
   getAchivments() {
     const { student } = this;
     const sql = `SELECT
@@ -74,6 +78,78 @@ FROM (
       db.all(sql, [student.id, student.id], (err, row) => {
         if (err) reject(err);
         resolve(row);
+      });
+    });
+  }
+  getAllStudents() {
+    const { student } = this;
+    let offset = student.limit - 30;
+    const sql = `SELECT * FROM User WHERE grade_id = ? LIMIT ? OFFSET ?`;
+    return new Promise((resolve, reject) => {
+      db.all(sql, [student.stage, student.limit, offset], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+  }
+  Create() {
+    const { student } = this;
+    const hashedPassword = crypto
+      .createHash("sha256")
+      .update(student.password)
+      .digest("hex");
+    const id = uuidv4();
+
+    const sql =
+      "INSERT INTO User (id, username, password, grade_id, isBlocked, BlockReason, parent_phone) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    return new Promise((resolve, reject) => {
+      db.run(
+        sql,
+        [
+          id,
+          student.username,
+          hashedPassword,
+          student.grade,
+          student.isBlocked,
+          student.BlockReason,
+          student.parent_phone,
+        ],
+        (err) => {
+          if (err) reject(err);
+          resolve("success");
+        },
+      );
+    });
+  }
+  Update() {
+    const { student } = this;
+    const sql =
+      "UPDATE User SET username = ?, grade_id = ?, isBlocked = ?, BlockReason = ?, parent_phone = ? WHERE id = ?";
+    return new Promise((resolve, reject) => {
+      db.run(
+        sql,
+        [
+          student.username,
+          student.grade,
+          student.isBlocked,
+          student.BlockReason,
+          student.parent_phone,
+          student.id,
+        ],
+        (err) => {
+          if (err) reject(err);
+          resolve("success");
+        },
+      );
+    });
+  }
+  Delete() {
+    const { student } = this;
+    const sql = "DELETE FROM User WHERE id = ?";
+    return new Promise((resolve, reject) => {
+      db.run(sql, [student.id], (err) => {
+        if (err) reject(err);
+        resolve("success");
       });
     });
   }

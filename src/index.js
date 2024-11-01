@@ -20,7 +20,7 @@ app.use(
     preflightContinue: false,
     optionsSuccessStatus: 204,
     credentials: true,
-  })
+  }),
 );
 
 const StudentRouter = require("./routes/Student.Router");
