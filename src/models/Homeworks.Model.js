@@ -1,4 +1,5 @@
 const db = require("../database");
+const fs = require("fs");
 
 class Homeworks {
   constructor(homeworks) {
@@ -141,21 +142,27 @@ class Homeworks {
     const homework = this.homeworks;
     const sql = `INSERT INTO UserAnswerHomework(user_id, question_id, text_answer, choice_answer, is_right, homework_id) VALUES(?, ?, ?, ?, ?, ?)`;
     return new Promise((resolve, reject) => {
-      db.run(
-        sql,
-        [
-          homework.studentId,
-          homework.questionId,
-          homework.text_answer,
-          homework.choice_answer,
-          homework.isRight,
-          homework.id,
-        ],
-        (_, err) => {
-          if (err) reject(err);
-          return resolve();
-        }
-      );
+      const stmt = db.prepare(sql);
+      for (const answer of homework.answers) {
+        stmt.run(
+          [
+            answer.studentId,
+            answer.questionId,
+            answer.text_answer,
+            answer.choice_answer,
+            answer.isRight,
+            answer.homeworkId,
+          ],
+          (err) => {
+            if (err) {
+              stmt.finalize();
+              return reject(err);
+            }
+          }
+        );
+      }
+      stmt.finalize();
+      resolve();
     });
   }
   addResult() {
@@ -177,7 +184,7 @@ class Homeworks {
   getAll() {
     const homework = this.homeworks;
     let offset = homework.limit - 30;
-    console.log(homework, offset);
+
     return new Promise((resolve, reject) => {
       db.all(
         "SELECT * FROM Homework WHERE grade_id = ? LIMIT ? OFFSET ?",
@@ -185,6 +192,81 @@ class Homeworks {
         (err, rows) => {
           if (err) reject(err);
           resolve(rows);
+        }
+      );
+    });
+  }
+
+  async Create() {
+    const homework = this.homeworks;
+
+    homework.cover = "/homework/" + homework.cover;
+
+    const sql = `INSERT INTO Homework(homework_name, cover, grade_id, term_id, created_at) VALUES(?, ?, ?, ?, ?)`;
+    return new Promise((resolve, reject) => {
+      db.run(
+        sql,
+        [
+          homework.homework_name,
+          homework.cover,
+          homework.grade_id,
+          homework.term_id,
+          homework.created_at,
+        ],
+        (res, err) => {
+          if (err) reject(err);
+          return resolve(res);
+        }
+      );
+    });
+  }
+
+  Delete() {
+    const homework = this.homeworks;
+    const homeworkData = new Promise((resolve, reject) => {
+      db.get(
+        "SELECT cover FROM Homework WHERE id = ?",
+        [homework.id],
+        (err, row) => {
+          if (err) reject(err);
+          return resolve(row);
+        }
+      );
+    });
+
+    fs.unlink(homeworkData.cover, (err) => {
+      if (err) {
+        console.error("Error deleting the file:", err);
+      } else {
+        console.log("File deleted successfully");
+      }
+    });
+    const sql = `DELETE FROM Homework WHERE id = ?`;
+    return new Promise((resolve, reject) => {
+      db.run(sql, [homework.id], (err, res) => {
+        if (err) reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
+  Update() {
+    const homework = this.homeworks;
+
+    const sql = `UPDATE Homework SET homework_name = ?, grade_id = ?, term_id = ?, created_at = ? WHERE id = ?`;
+    return new Promise((resolve, reject) => {
+      db.run(
+        sql,
+        [
+          homework.homework_name,
+          homework.grade_id,
+          homework.term_id,
+          homework.created_at,
+          homework.id,
+        ],
+        (err, res) => {
+          if (err) reject(err);
+          return resolve(res);
         }
       );
     });

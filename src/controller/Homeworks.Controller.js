@@ -105,30 +105,33 @@ const SubmitHomework = async (req, res) => {
 
     const { result, newAnswers } = AutoCorrect(answers, questions);
 
-    newAnswers.forEach(async (answer) => {
+    const answersToInsert = [];
+
+    newAnswers.forEach((answer) => {
       if (answer.type === "choice") {
-        await new Homeworks({
+        answersToInsert.push({
           studentId: student_id,
           questionId: answer.questionId,
           text_answer: null,
           choice_answer: answer.answer.the_answer,
           isRight: answer.answer.isRight,
-          id: id,
-        }).addAnswers();
-      }
-      if (answer.type === "input") {
-        answer.answer.forEach(async (an) => {
-          await new Homeworks({
+          homeworkId: id,
+        });
+      } else if (answer.type === "input") {
+        answer.answer.forEach((an) => {
+          answersToInsert.push({
             studentId: student_id,
             questionId: answer.questionId,
             text_answer: an.the_answer,
             choice_answer: null,
             isRight: an.isRight,
-            id: id,
-          }).addAnswers();
+            homeworkId: id,
+          });
         });
       }
     });
+
+    await new Homeworks({ answers }).addAnswers();
 
     await new Homeworks({
       id: id,
@@ -163,6 +166,7 @@ const GetAllHomeworksTeacher = async (req, res) => {
       stage: parseInt(stage),
       limit: parseInt(limit),
     }).getAll();
+
     const grades = await new Grades({}).GetAll();
     res.status(200).json({ homeworks, grades });
   } catch (error) {
@@ -171,64 +175,69 @@ const GetAllHomeworksTeacher = async (req, res) => {
   }
 };
 
-// const CreateStudent = async (req, res) => {
-//   try {
-//     const student = req.body;
+const CreateHomework = async (req, res) => {
+  try {
+    const homework = req.body;
 
-//     const message = await new Student({
-//       username: student.username,
-//       password: student.password,
-//       grade: student.grade,
-//       parent_phone: student.parent_phone,
-//       isBlocked: student.isBlocked,
-//       BlockReason: student.BlockReason,
-//     }).Create();
+    let cover = null;
+    if (req.file) {
+      cover = req.file.filename;
+    }
 
-//     res.json({
-//       message: message,
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: error });
-//   }
-// };
+    console.log(cover);
 
-// const UpdateStudent = async (req, res) => {
-//   try {
-//     const student = req.body;
-//     const message = await new Student({
-//       username: student.username,
-//       password: student.password,
-//       grade: student.grade,
-//       parent_phone: student.parent_phone,
-//       isBlocked: student.isBlocked,
-//       BlockReason: student.BlockReason,
-//       id: student.id,
-//     }).Update();
-//     res.json({
-//       message: message,
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: error });
-//   }
-// };
+    const message = await new Homeworks({
+      homework_name: homework.homework_name,
+      cover: cover,
+      grade_id: parseInt(homework.grade),
+      term_id: parseInt(homework.term_id),
+      created_at: homework.created_at,
+    }).Create();
 
-// const DeleteStudent = async (req, res) => {
-//   try {
-//     const id = req.params.id;
-//     const message = await new Student({
-//       id,
-//     }).Delete();
+    res.json({
+      message: message,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
 
-//     res.json({
-//       message: message,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: err });
-//   }
-// };
+const UpdateHomework = async (req, res) => {
+  try {
+    const homework = req.body;
+    const message = await new Homeworks({
+      homework_name: homework.homework_name,
+      grade_id: homework.grade,
+      term_id: homework.term_id,
+      created_at: homework.created_at,
+      id: homework.id,
+    }).Update();
+    res.json({
+      message: message,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+const DeleteHomework = async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const message = await new Homeworks({
+      id,
+    }).Delete();
+
+    res.json({
+      message: message,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err });
+  }
+};
 
 module.exports = {
   GetHomeworks,
@@ -237,4 +246,7 @@ module.exports = {
   GetAllHomeworksTeacher,
   SubmitHomework,
   Results,
+  CreateHomework,
+  DeleteHomework,
+  UpdateHomework,
 };

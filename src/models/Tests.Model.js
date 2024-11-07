@@ -183,6 +183,88 @@ class Tests {
       });
     });
   }
+
+  getAll() {
+    const test = this.tests;
+    let offset = test.limit - 30;
+
+    return new Promise((resolve, reject) => {
+      db.all(
+        "SELECT * FROM Tests WHERE grade_id = ? LIMIT ? OFFSET ?",
+        [test.stage, 30, offset],
+        (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        }
+      );
+    });
+  }
+
+  async Create() {
+    const test = this.tests;
+
+    test.cover = "/test/" + test.cover;
+
+    const sql = `INSERT INTO Tests(test_name, cover, grade_id, term_id, created_at, expire_date) VALUES(?, ?, ?, ?, ?, ?)`;
+    return new Promise((resolve, reject) => {
+      db.run(
+        sql,
+        [
+          test.test_name,
+          test.cover,
+          test.grade_id,
+          test.term_id,
+          test.created_at,
+          test.expire_date,
+        ],
+        (res, err) => {
+          if (err) reject(err);
+          return resolve(res);
+        }
+      );
+    });
+  }
+
+  Delete() {
+    const test = this.tests;
+    const testData = new Promise((resolve, reject) => {
+      db.get("SELECT cover FROM Tests WHERE id = ?", [test.id], (err, row) => {
+        if (err) reject(err);
+        return resolve(row);
+      });
+    });
+
+    fs.unlink(testData.cover, (err) => {
+      if (err) {
+        console.error("Error deleting the file:", err);
+      } else {
+        console.log("File deleted successfully");
+      }
+    });
+    const sql = `DELETE FROM Tests WHERE id = ?`;
+    return new Promise((resolve, reject) => {
+      db.run(sql, [test.id], (err, res) => {
+        if (err) reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
+  Update() {
+    const test = this.tests;
+
+    const sql = `UPDATE Tests SET test_name = ?, grade_id = ?, term_id = ?, created_at = ? WHERE id = ?`;
+    return new Promise((resolve, reject) => {
+      db.run(
+        sql,
+        [test.test_name, test.grade_id, test.term_id, test.created_at, test.id],
+        (err, res) => {
+          if (err) reject(err);
+          return resolve(res);
+        }
+      );
+    });
+  }
 }
 
 module.exports = Tests;

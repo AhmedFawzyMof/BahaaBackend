@@ -1,5 +1,6 @@
 const TestsModel = require("../models/Tests.Model");
 const StudentsModel = require("../models/Students.Model");
+const Grades = require("../models/Grade.Model");
 const { AutoCorrect } = require("../utils/AutoCorrect");
 
 const GetTests = async (req, res) => {
@@ -146,10 +147,94 @@ const Results = async (req, res) => {
   }
 };
 
+const GetAllTestsTeacher = async (req, res) => {
+  try {
+    const { stage, limit } = req.params;
+
+    const tests = await new TestsModel({
+      stage: parseInt(stage),
+      limit: parseInt(limit),
+    }).getAll();
+
+    const grades = await new Grades({}).GetAll();
+    res.status(200).json({ tests, grades });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+const CreateTest = async (req, res) => {
+  try {
+    const test = req.body;
+
+    let cover = null;
+    if (req.file) {
+      cover = req.file.filename;
+    }
+
+    const message = await new TestsModel({
+      test_name: test.test_name,
+      cover: cover,
+      grade_id: parseInt(test.grade),
+      term_id: parseInt(test.term_id),
+      created_at: test.created_at,
+      expire_date: test.expire_date,
+    }).Create();
+
+    res.json({
+      message: message,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+const UpdateTest = async (req, res) => {
+  try {
+    const test = req.body;
+    const message = await new TestsModel({
+      test_name: test.test_name,
+      grade_id: test.grade,
+      term_id: test.term_id,
+      created_at: test.created_at,
+      id: test.id,
+    }).Update();
+    res.json({
+      message: message,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+const DeleteTest = async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const message = await new TestsModel({
+      id,
+    }).Delete();
+
+    res.json({
+      message: message,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err });
+  }
+};
+
 module.exports = {
   GetTests,
   GetAllTests,
   GetTestQuestions,
   SubmitTest,
   Results,
+  GetAllTestsTeacher,
+  CreateTest,
+  UpdateTest,
+  DeleteTest,
 };
