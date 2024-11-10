@@ -15,11 +15,7 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: ["*"], // Replace with your frontend URL(s)
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-    credentials: true,
+    origin: "*",
   })
 );
 
