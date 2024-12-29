@@ -17,10 +17,11 @@ const Login = async (req, res) => {
 
     teacher.type = "teacher";
 
+    // eslint-disable-next-line no-undef
     const token = jwt.sign({ teacher: teacher }, process.env.JWT_SECRET);
     res.status(200).json({ token });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ message: error });
   }
 };
@@ -46,7 +47,36 @@ const GetDashboard = async (req, res) => {
 
     res.status(200).json({ dashboard });
   } catch (error) {
-    console.log(error);
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+const ChangeMarks = async (req, res) => {
+  try {
+    const { type, id } = req.params;
+    const body = req.body;
+
+    await new TeacherModel({
+      right: body.right,
+      answer_id: body.answer_id,
+      type,
+      id,
+    }).ChangeMarks();
+    res.status(200).json({ message: "Marks changed successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+const PublishResult = async (req, res) => {
+  try {
+    const { type, id, student_id, published } = req.body;
+    await new TeacherModel({ type, id, student_id, published }).PublishResult();
+    res.status(200).json({ message: "Result published successfully" });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error });
   }
 };
@@ -54,4 +84,6 @@ const GetDashboard = async (req, res) => {
 module.exports = {
   Login,
   GetDashboard,
+  ChangeMarks,
+  PublishResult,
 };

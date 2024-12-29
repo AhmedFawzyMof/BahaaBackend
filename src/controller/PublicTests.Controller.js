@@ -1,36 +1,14 @@
-const TestsModel = require("../models/Tests.Model");
+const PublicTestsModel = require("../models/PublicTests.Model");
 const StudentsModel = require("../models/Students.Model");
 const Grades = require("../models/Grade.Model");
 const { AutoCorrect, formatQuestions } = require("../utils/AutoCorrect");
-
-const GetTests = async (req, res) => {
-  try {
-    const { id, grade_id } = req.params.student;
-    const tests = await TestsModel.getTests(id, grade_id);
-    res.status(200).json(tests);
-  } catch (error) {
-    res.status(500).json({ error: error });
-  }
-};
-
-const GetAllTests = async (req, res) => {
-  try {
-    const { id, grade_id } = req.params.student;
-    const { limit } = req.params;
-
-    const tests = await TestsModel.getAllTests(id, grade_id, limit);
-    res.status(200).json(tests);
-  } catch (error) {
-    res.status(500).json({ error: error });
-  }
-};
 
 const GetTestQuestions = async (req, res) => {
   try {
     const grade_id = req.params.student.grade_id;
     const student_id = req.params.student.id;
     const { id } = req.params;
-    const test = await new TestsModel({
+    const test = await new PublicTestsModel({
       id,
       grade_id,
       student_id,
@@ -61,14 +39,10 @@ const GetTestQuestions = async (req, res) => {
 
 const SubmitTest = async (req, res) => {
   try {
-    const grade_id = req.params.student.grade_id;
-    const student_id = req.params.student.id;
     const { id } = req.params;
-    const answers = req.body;
-    const test = await new TestsModel({
-      id,
-      grade_id,
-      student_id,
+    const { answers, student_name, student_phone } = req.body;
+    const test = await new PublicTestsModel({
+      test_id: id,
     }).getTestQuestionsForAnswer();
 
     const questions = [];
@@ -95,40 +69,38 @@ const SubmitTest = async (req, res) => {
     }
 
     const { result, newAnswers } = AutoCorrect(answers, questions);
-    const answersToInsert = [];
 
-    newAnswers.forEach((answer) => {
+    newAnswers.forEach(async (answer) => {
       if (answer.type === "choice") {
-        answersToInsert.push({
-          student_id: student_id,
-          question_id: answer.questionId,
+        await new PublicTestsModel({
+          name: student_name,
+          phone: student_phone,
+          questionId: answer.questionId,
           text_answer: null,
           choice_answer: answer.answer.the_answer,
           isRight: answer.answer.isRight,
-          test_id: id,
-        });
+          id: id,
+        }).addAnswers();
       }
       if (answer.type === "input") {
-        answer.answer.forEach((input) => {
-          answersToInsert.push({
-            student_id: student_id,
-            question_id: answer.questionId,
-            text_answer: null,
-            choice_answer: input.the_answer,
-            isRight: input.isRight,
-            test_id: id,
-          });
+        answer.answer.forEach(async (an) => {
+          await new PublicTestsModel({
+            name: student_name,
+            phone: student_phone,
+            questionId: answer.questionId,
+            text_answer: an.the_answer,
+            choice_answer: null,
+            isRight: an.isRight,
+            id: id,
+          }).addAnswers();
         });
       }
     });
 
-    await new TestsModel({
-      answers: answersToInsert,
-    }).addAnswers();
-
-    await new TestsModel({
+    await new PublicTestsModel({
       id: id,
-      studentId: student_id,
+      student_name,
+      student_phone,
       result: result,
     }).addResult();
 
@@ -156,12 +128,13 @@ const GetAllTestsTeacher = async (req, res) => {
   try {
     const { stage, limit } = req.params;
 
-    const tests = await new TestsModel({
+    const tests = await new PublicTestsModel({
       stage: parseInt(stage),
       limit: parseInt(limit),
     }).getAll();
 
     const grades = await new Grades({}).GetAll();
+
     res.status(200).json({ tests, grades });
   } catch (error) {
     console.error(error);
@@ -173,14 +146,8 @@ const CreateTest = async (req, res) => {
   try {
     const test = req.body;
 
-    let cover = null;
-    if (req.file) {
-      cover = req.file.filename;
-    }
-
-    const message = await new TestsModel({
+    const message = await new PublicTestsModel({
       test_name: test.test_name,
-      cover: cover,
       grade_id: parseInt(test.grade),
       term_id: parseInt(test.term_id),
       created_at: test.created_at,
@@ -199,12 +166,11 @@ const CreateTest = async (req, res) => {
 const UpdateTest = async (req, res) => {
   try {
     const test = req.body;
-    const message = await new TestsModel({
+    const message = await new PublicTestsModel({
       test_name: test.test_name,
       grade_id: test.grade,
       term_id: test.term_id,
       created_at: test.created_at,
-      expire_date: test.expire_date,
       id: test.id,
     }).Update();
     res.json({
@@ -220,7 +186,7 @@ const DeleteTest = async (req, res) => {
   try {
     const id = req.params.id;
 
-    const message = await new TestsModel({
+    const message = await new PublicTestsModel({
       id,
     }).Delete();
 
@@ -233,10 +199,30 @@ const DeleteTest = async (req, res) => {
   }
 };
 
+const CheckUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone } = req.body;
+
+    const response = await new PublicTestsModel({
+      id: id,
+      student_name: name,
+      student_phone: phone,
+    }).CheckUser();
+
+    res.status(200).json({
+      message: response === undefined ? "لا يوجد مستخدم بهذه البيانات" : "",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
 const TestDitails = async (req, res) => {
   try {
     const { type, id } = req.params;
-    var { passRate, avgGrade, data } = await new TestsModel({
+    var { passRate, avgGrade, data } = await new PublicTestsModel({
       id,
       type,
     }).Ditails();
@@ -259,7 +245,8 @@ const TestDitails = async (req, res) => {
 const TestAnswers = async (req, res) => {
   try {
     const { test_id, student_id } = req.params;
-    const { testAnswers, studentAnswers, published } = await new TestsModel({
+    console.log(req.params);
+    const { testAnswers, studentAnswers } = await new PublicTestsModel({
       id: test_id,
       student_id,
     }).Answers();
@@ -333,7 +320,6 @@ const TestAnswers = async (req, res) => {
     });
 
     res.status(200).json({
-      published,
       answers: TestAnswers,
     });
   } catch (error) {
@@ -343,8 +329,6 @@ const TestAnswers = async (req, res) => {
 };
 
 module.exports = {
-  GetTests,
-  GetAllTests,
   GetTestQuestions,
   SubmitTest,
   Results,
@@ -352,6 +336,7 @@ module.exports = {
   CreateTest,
   UpdateTest,
   DeleteTest,
+  CheckUser,
   TestDitails,
   TestAnswers,
 };

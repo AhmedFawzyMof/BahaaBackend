@@ -1,34 +1,11 @@
 const db = require("../database");
-const fs = require("fs");
 
-class Tests {
+class PublicTests {
   constructor(tests) {
     this.tests = tests;
   }
 
-  static async getTests(studentId, grade) {
-    return new Promise((resolve, reject) => {
-      const currentDate = new Date();
-      const egyptTime = new Date(
-        currentDate.toLocaleString("en-US", { timeZone: "Africa/Cairo" })
-      );
-      const formattedDateTime = egyptTime
-        .toISOString()
-        .slice(0, 19)
-        .replace("T", " ");
-
-      db.all(
-        `SELECT Tests.id, Tests.test_name, Tests.cover, Tests.created_at, Tests.expire_date, (SELECT test_id FROM UserTestResult WHERE UserTestResult.user_id = ?) AS SOLVED_TEST FROM Tests LEFT JOIN UserTestResult ON UserTestResult.test_id = Tests.id WHERE Tests.id IS NOT SOLVED_TEST AND Tests.created_at <= ? AND Tests.expire_date >= ? AND Tests.grade_id = ? LIMIT 4`,
-        [studentId, formattedDateTime, formattedDateTime, grade],
-        (err, rows) => {
-          if (err) reject(err);
-          resolve(rows);
-        }
-      );
-    });
-  }
-
-  static async getAllTests(studentId, grade, limit) {
+  static async getAllTests(studentPhone, grade, limit) {
     return new Promise((resolve, reject) => {
       const currentDate = new Date();
       const formattedDateTime = currentDate
@@ -40,8 +17,15 @@ class Tests {
       const Offset = Limit - 30;
 
       db.all(
-        `SELECT Tests.id, Tests.test_name, Tests.cover, Tests.created_at, Tests.expire_date, (SELECT test_id FROM UserTestResult WHERE UserTestResult.user_id = ?) AS FT FROM Tests LEFT JOIN UserTestResult ON UserTestResult.test_id = Tests.id WHERE Tests.id IS NOT FT AND Tests.id AND Tests.created_at <= ? AND Tests.expire_date >= ? AND Tests.grade_id = ? LIMIT ? OFFSET ?`,
-        [studentId, formattedDateTime, formattedDateTime, grade, Limit, Offset],
+        `SELECT PublicTests.id, PublicTests.test_name, PublicTests.cover, PublicTests.created_at, PublicTests.expire_date, (SELECT test_id FROM TempUserResult WHERE TempUserResult.phone = ?) AS FT FROM Tests LEFT JOIN TempUserResult ON TempUserResult.test_id = PublicTests.id WHERE PublicTests.id IS NOT FT AND PublicTests.id AND PublicTests.created_at <= ? AND PublicTests.expire_date >= ? AND PublicTests.grade_id = ? LIMIT ? OFFSET ?`,
+        [
+          studentPhone,
+          formattedDateTime,
+          formattedDateTime,
+          grade,
+          Limit,
+          Offset,
+        ],
         (err, rows) => {
           if (err) reject(err);
           resolve(rows);
@@ -56,15 +40,12 @@ class Tests {
     const egyptTime = new Date(
       currentDate.toLocaleString("en-US", { timeZone: "Africa/Cairo" })
     );
-    const formattedDateTime = egyptTime
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
+    const formattedDateTime = egyptTime.toISOString().slice(0, 19);
 
     const solved_test = new Promise((resolve, reject) => {
       db.all(
-        "SELECT UserTestResult.id FROM UserTestResult LEFT JOIN Tests ON Tests.id = UserTestResult.test_id WHERE UserTestResult.test_id = ? AND UserTestResult.user_id = ? OR Tests.expire_date >= ? ",
-        [test.test_id, test.student_id, formattedDateTime],
+        "SELECT TempUserResult.id FROM TempUserResult LEFT JOIN PublicTests ON PublicTests.id = TempUserResult.test_id WHERE TempUserResult.test_id = ? AND TempUserResult.phone = ? OR PublicTests.expire_date >= ? ",
+        [test.test_id, test.student_phone, formattedDateTime],
         (err, rows) => {
           if (err) reject(err);
           resolve(rows);
@@ -77,7 +58,7 @@ class Tests {
     }
     const questions_ids = new Promise((resolve, reject) => {
       db.all(
-        "SELECT question_id FROM ConnectQuestions WHERE test_id = ?",
+        "SELECT question_id FROM ConnectQuestions WHERE publictest_id = ?",
         [test.id],
         (err, rows) => {
           if (err) reject(err);
@@ -107,15 +88,12 @@ class Tests {
     const egyptTime = new Date(
       currentDate.toLocaleString("en-US", { timeZone: "Africa/Cairo" })
     );
-    const formattedDateTime = egyptTime
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
+    const formattedDateTime = egyptTime.toISOString().slice(0, 19);
 
     const solved_test = new Promise((resolve, reject) => {
       db.all(
-        "SELECT UserTestResult.id FROM UserTestResult LEFT JOIN Tests ON Tests.id = UserTestResult.test_id WHERE UserTestResult.test_id = ? AND UserTestResult.user_id = ? OR Tests.expire_date >= ? ",
-        [test.test_id, test.student_id, formattedDateTime],
+        "SELECT TempUserResult.id FROM TempUserResult LEFT JOIN PublicTests ON PublicTests.id = TempUserResult.test_id WHERE TempUserResult.test_id = ? OR PublicTests.expire_date >= ? ",
+        [test.test_id, formattedDateTime],
         (err, rows) => {
           if (err) reject(err);
           resolve(rows);
@@ -129,8 +107,8 @@ class Tests {
 
     const questions_ids = new Promise((resolve, reject) => {
       db.all(
-        "SELECT question_id FROM ConnectQuestions WHERE test_id = ?",
-        [test.id],
+        "SELECT question_id FROM ConnectQuestions WHERE publictest_id = ?",
+        [test.test_id],
         (err, rows) => {
           if (err) reject(err);
           resolve(rows);
@@ -154,44 +132,35 @@ class Tests {
   }
   addAnswers() {
     const test = this.tests;
-    const sql = `INSERT INTO UserAnswerTest(user_id, question_id, text_answer, choice_answer, is_right, test_id) VALUES(?, ?, ?, ?, ?, ?)`;
+
+    const sql = `INSERT INTO TempUserAnswers(name, phone, question_id, text_answer, choice_answer, is_right, test_id) VALUES(?, ?, ?, ?, ?, ?, ?)`;
     return new Promise((resolve, reject) => {
-      const stmt = db.prepare(sql);
-      for (const answer of test.answers) {
-        stmt.run(
-          [
-            answer.student_id,
-            answer.question_id,
-            answer.text_answer,
-            answer.choice_answer,
-            answer.isRight,
-            answer.test_id,
-          ],
-          (err) => {
-            if (err) {
-              stmt.finalize();
-              return reject(err);
-            }
-          }
-        );
-      }
-      stmt.finalize();
-      return resolve();
+      db.run(
+        sql,
+        [
+          test.name,
+          test.phone,
+          test.questionId,
+          test.text_answer,
+          test.choice_answer,
+          test.isRight,
+          test.id,
+        ],
+        (_, err) => {
+          if (err) reject(err);
+          return resolve();
+        }
+      );
     });
   }
   addResult() {
     const test = this.tests;
-    const currentDate = new Date();
-    const egyptTime = new Date(
-      currentDate.toLocaleString("en-US", { timeZone: "Africa/Cairo" })
-    );
-    const formattedDateTime = egyptTime.toISOString().slice(0, 19);
 
-    const sql = `INSERT INTO UserTestResult(test_id, user_id, result, public, submitted_at) VALUES(?, ?, ?, ?, ?)`;
+    const sql = `INSERT INTO TempUserResult(test_id, name, phone, result, public) VALUES(?, ?, ?, ?, ?)`;
     return new Promise((resolve, reject) => {
       db.run(
         sql,
-        [test.id, test.studentId, test.result, 0, formattedDateTime],
+        [test.id, test.student_name, test.student_phone, test.result, 0],
         (res, err) => {
           if (err) reject(err);
           return resolve(res);
@@ -206,7 +175,7 @@ class Tests {
 
     return new Promise((resolve, reject) => {
       db.all(
-        "SELECT * FROM Tests WHERE grade_id = ? LIMIT ? OFFSET ?",
+        "SELECT * FROM PublicTests WHERE grade_id = ? LIMIT ? OFFSET ?",
         [test.stage, 30, offset],
         (err, rows) => {
           if (err) reject(err);
@@ -219,15 +188,12 @@ class Tests {
   async Create() {
     const test = this.tests;
 
-    test.cover = "/test/" + test.cover;
-
-    const sql = `INSERT INTO Tests(test_name, cover, grade_id, term_id, created_at, expire_date) VALUES(?, ?, ?, ?, ?, ?)`;
+    const sql = `INSERT INTO PublicTests(test_name, grade_id, term_id, created_at, expire_date) VALUES(?, ?, ?, ?, ?)`;
     return new Promise((resolve, reject) => {
       db.run(
         sql,
         [
           test.test_name,
-          test.cover,
           test.grade_id,
           test.term_id,
           test.created_at,
@@ -241,26 +207,9 @@ class Tests {
     });
   }
 
-  async Delete() {
+  Delete() {
     const test = this.tests;
-    const testData = new Promise((resolve, reject) => {
-      db.get("SELECT cover FROM Tests WHERE id = ?", [test.id], (err, row) => {
-        if (err) reject(err);
-        return resolve(row);
-      });
-    });
-
-    const { cover } = await testData;
-    if (cover !== "") {
-      fs.unlink("./public" + cover, (err) => {
-        if (err) {
-          console.error("Error deleting the file:", err);
-        } else {
-          console.log("File deleted successfully");
-        }
-      });
-    }
-    const sql = `DELETE FROM Tests WHERE id = ?`;
+    const sql = `DELETE FROM PublicTests WHERE id = ?`;
     return new Promise((resolve, reject) => {
       db.run(sql, [test.id], (err, res) => {
         if (err) reject(err);
@@ -272,18 +221,11 @@ class Tests {
   Update() {
     const test = this.tests;
 
-    const sql = `UPDATE Tests SET test_name = ?, grade_id = ?, term_id = ?, created_at = ?, expire_date = ? WHERE id = ?`;
+    const sql = `UPDATE PublicTests SET test_name = ?, grade_id = ?, term_id = ?, created_at = ? WHERE id = ?`;
     return new Promise((resolve, reject) => {
       db.run(
         sql,
-        [
-          test.test_name,
-          test.grade_id,
-          test.term_id,
-          test.created_at,
-          test.expire_date,
-          test.id,
-        ],
+        [test.test_name, test.grade_id, test.term_id, test.created_at, test.id],
         (err, res) => {
           if (err) reject(err);
           return resolve(res);
@@ -291,12 +233,26 @@ class Tests {
       );
     });
   }
+  CheckUser() {
+    const test = this.tests;
 
+    const sql = `SELECT * FROM TempUserResult WHERE test_id = ? AND name = ? OR phone = ?`;
+    return new Promise((resolve, reject) => {
+      db.get(
+        sql,
+        [test.id, test.student_name, test.student_phone],
+        (err, res) => {
+          if (err) reject(err);
+          return resolve(res);
+        }
+      );
+    });
+  }
   async Ditails() {
     const test = this.tests;
     const passRate = await new Promise((resolve, reject) => {
       db.get(
-        "SELECT COUNT(*) AS number_of_pass, (SELECT COUNT(*) FROM UserTestResult WHERE test_id = ?) AS total_students FROM UserTestResult WHERE test_id = ? AND result >= 50;",
+        "SELECT COUNT(*) AS number_of_pass, (SELECT COUNT(*) FROM TempUserResult WHERE test_id = ?) AS total_students FROM TempUserResult WHERE test_id = ? AND result >= 50;",
         [test.id, test.id],
         (err, row) => {
           if (err) reject(err);
@@ -308,7 +264,7 @@ class Tests {
 
     const avgGrade = await new Promise((resolve, reject) => {
       db.get(
-        "SELECT AVG(result) AS average_result FROM UserTestResult WHERE test_id = ?",
+        "SELECT AVG(result) AS average_result FROM TempUserResult WHERE test_id = ?",
         [test.id],
         (err, row) => {
           if (err) reject(err);
@@ -322,7 +278,7 @@ class Tests {
     if (test.type === "questions") {
       const questionsConnected = await new Promise((resolve, reject) => {
         db.all(
-          "SELECT question_id FROM ConnectQuestions WHERE test_id = ?",
+          "SELECT question_id FROM ConnectQuestions WHERE publictest_id = ?",
           [test.id],
           (err, rows) => {
             if (err) reject(err);
@@ -352,7 +308,7 @@ class Tests {
     } else {
       data = await new Promise((resolve, reject) => {
         db.all(
-          "SELECT User.id, User.username, Grade.grade_name, UserTestResult.result FROM UserTestResult INNER JOIN User ON UserTestResult.user_id = User.id INNER JOIN Grade ON User.grade_id = Grade.id WHERE test_id = ?",
+          "SELECT TempUserResult.name, TempUserResult.phone, Grade.grade_name, TempUserResult.result FROM TempUserResult INNER JOIN PublicTests ON TempUserResult.test_id = PublicTests.id INNER JOIN Grade ON PublicTests.grade_id = Grade.id WHERE test_id = ?",
           [test.id],
           (err, rows) => {
             if (err) reject(err);
@@ -374,7 +330,7 @@ class Tests {
 
     const testQuestionsIds = await new Promise((resolve, reject) => {
       db.all(
-        `SELECT Questions.id FROM ConnectQuestions INNER JOIN Questions ON ConnectQuestions.question_id = Questions.id WHERE test_id = ?`,
+        `SELECT Questions.id FROM ConnectQuestions INNER JOIN Questions ON ConnectQuestions.question_id = Questions.id WHERE publictest_id = ?`,
         [test.id],
         (err, rows) => {
           if (err) reject(err);
@@ -385,7 +341,7 @@ class Tests {
 
     const studentAnswers = await new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, question_id, text_answer, choice_answer, is_right FROM UserAnswerTest WHERE test_id = ? AND user_id = ?`,
+        `SELECT id, question_id, text_answer, choice_answer, is_right FROM TempUserAnswers WHERE test_id = ? AND phone = ?`,
         [test.id, test.student_id],
         (err, rows) => {
           if (err) reject(err);
@@ -407,19 +363,8 @@ class Tests {
       );
     });
 
-    const published = await new Promise((resolve, reject) => {
-      db.get(
-        "SELECT public FROM UserTestResult WHERE test_id = ? AND user_id = ?",
-        [test.id, test.student_id],
-        (err, row) => {
-          if (err) reject(err);
-          resolve(row);
-        }
-      );
-    });
-
-    return { testAnswers, studentAnswers, published };
+    return { testAnswers, studentAnswers };
   }
 }
 
-module.exports = Tests;
+module.exports = PublicTests;

@@ -6,10 +6,15 @@ const validateToken = (req, res, next) => {
   if (!token) {
     return res.status(401).json({ message: "Unauthorized" });
   }
+  // eslint-disable-next-line no-undef
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.status(401).json({ message: "Unauthorized" });
     }
+    if (!decoded.student.id || !decoded.student.grade_id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     req.params.student = { ...decoded.student };
     next();
   });
@@ -21,7 +26,7 @@ const validateTeacher = (req, res, next) => {
   if (!token) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-
+  // eslint-disable-next-line no-undef
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.status(401).json({ message: "Unauthorized" });

@@ -1,7 +1,7 @@
 const Homeworks = require("../models/Homeworks.Model");
 const StudentsModel = require("../models/Students.Model");
 const Grades = require("../models/Grade.Model");
-const { AutoCorrect } = require("../utils/AutoCorrect");
+const { AutoCorrect, formatQuestions } = require("../utils/AutoCorrect");
 
 const GetHomeworks = async (req, res) => {
   try {
@@ -9,7 +9,7 @@ const GetHomeworks = async (req, res) => {
     const homeworks = await Homeworks.getHomeworks(id, grade_id);
     res.json(homeworks);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ error: "حدث خطأ ما في الحصول على الواجبات" });
   }
 };
@@ -19,10 +19,14 @@ const GetAllHomeworks = async (req, res) => {
     const { id, grade_id } = req.params.student;
     const { limit } = req.params;
 
-    const homeworks = await Homeworks.getAllHomeworks(id, grade_id, limit);
+    const homeworks = await new Homeworks({
+      student_id: id,
+      grade_id,
+      limit,
+    }).getAllHomeworks();
     res.json(homeworks);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ error: "حدث خطأ ما في الحصول على الواجبات" });
   }
 };
@@ -61,7 +65,7 @@ const GetHomeworkQuestions = async (req, res) => {
 
     res.json(questions);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ error: "حدث خطأ ما في الحصول على الاسئلة" });
   }
 };
@@ -110,28 +114,29 @@ const SubmitHomework = async (req, res) => {
     newAnswers.forEach((answer) => {
       if (answer.type === "choice") {
         answersToInsert.push({
-          studentId: student_id,
-          questionId: answer.questionId,
+          student_id: student_id,
+          question_id: answer.questionId,
           text_answer: null,
           choice_answer: answer.answer.the_answer,
           isRight: answer.answer.isRight,
-          homeworkId: id,
+          homework_id: id,
         });
-      } else if (answer.type === "input") {
-        answer.answer.forEach((an) => {
+      }
+      if (answer.type === "input") {
+        answer.answer.forEach((input) => {
           answersToInsert.push({
-            studentId: student_id,
-            questionId: answer.questionId,
-            text_answer: an.the_answer,
+            student_id: student_id,
+            question_id: answer.questionId,
+            text_answer: input.the_answer,
             choice_answer: null,
-            isRight: an.isRight,
-            homeworkId: id,
+            isRight: input.isRight,
+            homework_id: id,
           });
         });
       }
     });
 
-    await new Homeworks({ answers }).addAnswers();
+    await new Homeworks({ answers: answersToInsert }).addAnswers();
 
     await new Homeworks({
       id: id,
@@ -143,7 +148,7 @@ const SubmitHomework = async (req, res) => {
       message: "تم تسليم الواجبات بنجاح",
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 };
 
@@ -153,7 +158,7 @@ const Results = async (req, res) => {
     const results = await new StudentsModel({ id, type: "homework" }).Results();
     res.status(200).json(results);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ message: error });
   }
 };
@@ -170,7 +175,7 @@ const GetAllHomeworksTeacher = async (req, res) => {
     const grades = await new Grades({}).GetAll();
     res.status(200).json({ homeworks, grades });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ message: error });
   }
 };
@@ -183,8 +188,6 @@ const CreateHomework = async (req, res) => {
     if (req.file) {
       cover = req.file.filename;
     }
-
-    console.log(cover);
 
     const message = await new Homeworks({
       homework_name: homework.homework_name,
@@ -239,6 +242,116 @@ const DeleteHomework = async (req, res) => {
   }
 };
 
+const HomeworkDitails = async (req, res) => {
+  try {
+    const { type, id } = req.params;
+    console.log(type, id);
+    var { passRate, avgGrade, data } = await new Homeworks({
+      id,
+      type,
+    }).Ditails();
+
+    if (type === "questions") {
+      data = formatQuestions(data);
+    }
+
+    res.status(200).json({
+      passRate,
+      avgGrade,
+      data,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
+const HomeworkAnswers = async (req, res) => {
+  try {
+    const { homework_id, student_id } = req.params;
+    const { homeworkAnswers, studentAnswers, published } = await new Homeworks({
+      id: homework_id,
+      student_id,
+    }).Answers();
+    const HomeworkAnswers = [];
+
+    homeworkAnswers.forEach((answer) => {
+      const existingAnswer = HomeworkAnswers.find((a) => answer.id === a.id);
+
+      if (!existingAnswer) {
+        HomeworkAnswers.push({
+          id: answer.id,
+          question: answer.question,
+          the_answer: answer.the_answer === null ? null : [answer.the_answer],
+          the_choice:
+            answer.the_choice === null
+              ? null
+              : [
+                  {
+                    is_right: answer.is_right_choice,
+                    choice: answer.the_choice,
+                  },
+                ],
+          is_right_choice: answer.is_right_choice,
+          student_answer: null,
+          is_student_answer_right: null,
+        });
+      }
+
+      if (existingAnswer) {
+        if (answer.the_answer !== null) {
+          existingAnswer.the_answer.push(answer.the_answer);
+        }
+        if (answer.the_choice !== null) {
+          existingAnswer.the_choice.push({
+            is_right: answer.is_right_choice,
+            choice: answer.the_choice,
+          });
+        }
+      }
+    });
+
+    studentAnswers.forEach((answer) => {
+      const existingAnswer = HomeworkAnswers.find(
+        (a) => answer.question_id === a.id
+      );
+
+      if (existingAnswer) {
+        if (answer.text_answer !== null) {
+          if (
+            existingAnswer.student_answer === null ||
+            !Array.isArray(existingAnswer.student_answer)
+          ) {
+            existingAnswer.student_answer = [
+              { id: answer.id, text_answer: answer.text_answer },
+            ];
+            existingAnswer.is_student_answer_right = [answer.is_right];
+          } else {
+            existingAnswer.student_answer.push({
+              id: answer.id,
+              text_answer: answer.text_answer,
+            });
+            existingAnswer.is_student_answer_right.push(answer.is_right);
+          }
+        } else if (answer.choice_answer !== null) {
+          existingAnswer.student_answer = [
+            { id: answer.id, choice_answer: answer.choice_answer },
+          ];
+          existingAnswer.is_student_answer_right = [answer.is_right];
+        }
+      }
+    });
+
+    res.status(200).json({
+      published: published,
+      answers: HomeworkAnswers,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error });
+  }
+};
+
 module.exports = {
   GetHomeworks,
   GetAllHomeworks,
@@ -249,4 +362,6 @@ module.exports = {
   CreateHomework,
   DeleteHomework,
   UpdateHomework,
+  HomeworkDitails,
+  HomeworkAnswers,
 };

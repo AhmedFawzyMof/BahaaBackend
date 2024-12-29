@@ -14,7 +14,6 @@ class Grades {
     });
   }
   Create() {
-    console.log(this.grade);
     const sql = "INSERT INTO Grade (grade_name) VALUES (?)";
     return new Promise((resolve, reject) => {
       db.run(sql, [this.grade.grade_name], (err, row) => {
@@ -36,6 +35,18 @@ class Grades {
     const sql = "DELETE FROM Grade WHERE id = ?";
     return new Promise((resolve, reject) => {
       db.run(sql, [this.grade.id], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+  }
+
+  GetGradeName() {
+    const { grade } = this;
+    const sql =
+      "SELECT Grade.grade_name FROM User INNER JOIN Grade ON User.grade_id = Grade.id WHERE User.id = ?";
+    return new Promise((resolve, reject) => {
+      db.get(sql, [grade.student_id], (err, row) => {
         if (err) reject(err);
         resolve(row);
       });

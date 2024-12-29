@@ -1,8 +1,6 @@
-const { throws } = require("assert");
 const db = require("../database");
 const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
-const { resolve } = require("path");
 
 class StudentsModel {
   constructor(student) {
@@ -23,28 +21,49 @@ class StudentsModel {
 
   Results() {
     const { student } = this;
-    const homeworkSql =
-      "SELECT UserHomeworkResult.homework_id, UserHomeworkResult.user_id, UserHomeworkResult.result, Homework.homework_name FROM UserHomeworkResult INNER JOIN Homework ON UserHomeworkResult.homework_id = Homework.id WHERE UserHomeworkResult.user_id = ? and UserHomeworkResult.public = 1";
-    const testSql =
-      "SELECT UserTestResult.test_id, UserTestResult.user_id, UserTestResult.result, Tests.test_name FROM UserTestResult INNER JOIN Tests ON UserTestResult.test_id = Tests.id WHERE UserTestResult.user_id = ? and UserTestResult.public = 1";
+    const QueryKeys = {
+      table: {
+        homework: "UserHomeworkResult",
+        test: "UserTestResult",
+        video: "VideoResult",
+      },
+      id: {
+        homework: "homework_id",
+        test: "test_id",
+        video: "video_id",
+      },
+      type: {
+        homework: "Homework",
+        test: "Tests",
+        video: "Videos",
+      },
+      column: {
+        homework: "homework_name",
+        test: "test_name",
+        video: "title",
+      },
+    };
+    // SELECT VideoResult.video_id, VideoResult.result, VideoResult.user_id, Videos.title FROM VideoResult INNER JOIN Videos ON VideoResult.video_id = Videos.id WHERE VideoResult.user_id = ? AND VideoResult.public = 1
+    const sql = `SELECT ${QueryKeys.table[student.type]}.${
+      QueryKeys.id[student.type]
+    }, ${QueryKeys.table[student.type]}.result, ${
+      QueryKeys.table[student.type]
+    }.user_id, ${QueryKeys.type[student.type]}.${
+      QueryKeys.column[student.type]
+    } FROM ${QueryKeys.table[student.type]} INNER JOIN ${
+      QueryKeys.type[student.type]
+    } ON ${QueryKeys.table[student.type]}.${QueryKeys.id[student.type]} = ${
+      QueryKeys.type[student.type]
+    }.id WHERE ${QueryKeys.table[student.type]}.user_id = ? AND ${
+      QueryKeys.table[student.type]
+    }.public = 1`;
 
-    if (student.type === "homework") {
-      return new Promise((resolve, reject) => {
-        db.all(homeworkSql, [student.id], (err, row) => {
-          if (err) reject(err);
-          resolve(row);
-        });
+    return new Promise((resolve, reject) => {
+      db.all(sql, [student.id], (err, rows) => {
+        if (err) reject(err);
+        resolve(rows);
       });
-    }
-
-    if (student.type === "test") {
-      return new Promise((resolve, reject) => {
-        db.all(testSql, [student.id], (err, row) => {
-          if (err) reject(err);
-          resolve(row);
-        });
-      });
-    }
+    });
   }
   getAchivments() {
     const { student } = this;
@@ -117,7 +136,7 @@ FROM (
         (err) => {
           if (err) reject(err);
           resolve("success");
-        },
+        }
       );
     });
   }
@@ -139,7 +158,7 @@ FROM (
         (err) => {
           if (err) reject(err);
           resolve("success");
-        },
+        }
       );
     });
   }
@@ -152,6 +171,60 @@ FROM (
         resolve("success");
       });
     });
+  }
+  async GetData() {
+    const { student } = this;
+
+    const homeworkChartData = await new Promise((resolve, reject) => {
+      db.all(
+        "SELECT strftime('%Y-%m', UserHomeworkResult.submitted_at) AS month, AVG(CAST(REPLACE(UserHomeworkResult.result, '%', '') AS REAL)) AS result FROM UserHomeworkResult INNER JOIN Homework ON UserHomeworkResult.homework_id = Homework.id WHERE UserHomeworkResult.submitted_at >= date('now', '-5 months') AND UserHomeworkResult.user_id = ? GROUP BY strftime('%Y-%m', UserHomeworkResult.submitted_at) ORDER BY month",
+        [student.id],
+        (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        }
+      );
+    });
+
+    const testsChartData = await new Promise((resolve, reject) => {
+      db.all(
+        "SELECT strftime('%Y-%m', UserTestResult.submitted_at) AS month, AVG(CAST(REPLACE(UserTestResult.result, '%', '') AS REAL)) AS result FROM UserTestResult INNER JOIN Tests ON UserTestResult.test_id = Tests.id WHERE UserTestResult.submitted_at >= date('now', '-5 months') AND UserTestResult.user_id = ? GROUP BY strftime('%Y-%m', UserTestResult.submitted_at) ORDER BY month",
+        [student.id],
+        (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        }
+      );
+    });
+
+    const UserSolvedHomework = await new Promise((resolve, reject) => {
+      db.all(
+        "SELECT Homework.id, UserHomeworkResult.public, Homework.homework_name, UserHomeworkResult.result FROM UserHomeworkResult INNER JOIN Homework ON UserHomeworkResult.homework_id = Homework.id WHERE UserHomeworkResult.user_id = ?",
+        [student.id],
+        (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        }
+      );
+    });
+
+    const UserSolvedTests = await new Promise((resolve, reject) => {
+      db.all(
+        "SELECT Tests.id, UserTestResult.public, Tests.test_name, UserTestResult.result FROM UserTestResult INNER JOIN Tests ON UserTestResult.test_id = Tests.id WHERE UserTestResult.user_id = ?",
+        [student.id],
+        (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        }
+      );
+    });
+
+    return {
+      homeworkChartData,
+      testsChartData,
+      UserSolvedHomework,
+      UserSolvedTests,
+    };
   }
 }
 
